@@ -1,0 +1,43 @@
+{
+  "name": "elysium-attribution",
+  "version": "1.0.3",
+  "description": "Multi-touch marketing attribution and payment gateway integration SDK for web storefronts and e-commerce platforms",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./gateways": {
+      "import": "./src/gateways/index.js"
+    },
+    "./tracking": {
+      "import": "./src/tracking/touchTracker.js"
+    },
+    "./config": {
+      "import": "./src/config/index.js"
+    }
+  },
+  "bin": {
+    "elysium": "./src/utils/cli.js"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js"
+  },
+  "keywords": [
+    "attribution",
+    "touch-tracking",
+    "marketing",
+    "utm",
+    "stripe",
+    "razorpay",
+    "paypal",
+    "payment-gateway",
+    "e-commerce"
+  ],
+  "author": "Elysium",
+  "license": "ISC"
+}
