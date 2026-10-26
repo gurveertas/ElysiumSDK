@@ -3,6 +3,7 @@ import { getConfig } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 
 export const VISITOR_ID_KEY = 'aid_vid';
+export const LEGACY_VISITOR_ID_KEY = 'attr_vid';
 let memoryVisitorId = null;
 
 /**
@@ -39,12 +40,12 @@ export function getVisitorId() {
     return memoryVisitorId;
   }
 
-  // 1. Try LocalStorage
-  let visitorId = safeLocalStorage.getItem(VISITOR_ID_KEY);
+  // 1. Try LocalStorage (primary or legacy key)
+  let visitorId = safeLocalStorage.getItem(VISITOR_ID_KEY) || safeLocalStorage.getItem(LEGACY_VISITOR_ID_KEY);
 
   // 2. Try Cookie if not in LocalStorage
   if (!visitorId) {
-    visitorId = getCookie(VISITOR_ID_KEY);
+    visitorId = getCookie(VISITOR_ID_KEY) || getCookie(LEGACY_VISITOR_ID_KEY);
   }
 
   // 3. Generate new if missing
@@ -64,6 +65,13 @@ export function getVisitorId() {
 
   memoryVisitorId = visitorId;
   return visitorId;
+}
+
+/**
+ * Reset memory visitor ID cache (primarily for tests)
+ */
+export function resetVisitorId() {
+  memoryVisitorId = null;
 }
 
 /**

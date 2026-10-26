@@ -1,41 +1,24 @@
-/**
- * ElysiumSDK TypeScript Definitions
- */
-
-export interface ElysiumGatewayConfig {
-  enabled?: boolean;
-  publishableKey?: string;
-  keyId?: string;
-  clientId?: string;
-  [key: string]: unknown;
-}
-
 export interface ElysiumConfig {
-  /** Elysium Public API Key */
+  /** Publishable API key provided by Elysium (pk_live_... or pk_test_...) */
   apiKey: string;
-  /** Elysium Backend API URL (default: https://asbTemp-production.up.railway.app) */
+  /** Attribution backend API URL (e.g. 'http://localhost:5000') */
   apiBaseUrl?: string;
-  /** Enable verbose console debug logs */
+  /** Enable debug logging in browser console */
   debug?: boolean;
-  /** Session timeout window in milliseconds (default: 30 minutes) */
+  /** Session inactivity window in ms (default: 30 minutes) */
   sessionWindowMs?: number;
-  /** CSS selector for payment buttons (default: .elysium-payment-button) */
+  /** CSS selector for detecting payment buttons */
   buttonSelector?: string;
-  /** Automatically track touch on initialization (default: true) */
+  /** Automatically record touch on page load */
   autoTrack?: boolean;
-  /** Optional RegExp to filter paths for touch tracking (e.g. product pages only) */
+  /** Restrict touch tracking to path matching regex */
   productPathRegex?: RegExp | string | null;
-  /** Cookie domain for cross-subdomain tracking (e.g. .example.com) */
+  /** Domain for cross-subdomain cookie tracking */
   cookieDomain?: string;
   /** Additional custom query parameters to track */
   customParams?: string[];
-  /** Supported payment gateway options */
-  gateways?: {
-    stripe?: ElysiumGatewayConfig;
-    razorpay?: ElysiumGatewayConfig;
-    paypal?: ElysiumGatewayConfig;
-    [key: string]: ElysiumGatewayConfig | undefined;
-  };
+  /** Gateway configuration options */
+  gateways?: Record<string, any>;
 }
 
 export interface TouchPayload {
@@ -49,157 +32,136 @@ export interface TouchPayload {
   referrer: string | null;
   landingPage: string;
   pageTitle: string;
-  channel?: string;
   gclid?: string | null;
-  dclid?: string | null;
-  wbraid?: string | null;
-  gbraid?: string | null;
-  srsltid?: string | null;
   fbclid?: string | null;
   ttclid?: string | null;
   msclkid?: string | null;
-  twclid?: string | null;
-  li_fat_id?: string | null;
-  rdt_cid?: string | null;
   fbc?: string | null;
   fbp?: string | null;
-  ttp?: string | null;
   ga?: string | null;
-  custom?: Record<string, unknown>;
+  [key: string]: any;
 }
 
 export interface TouchResponse {
   id: string;
+  touchId: string;
   visitorId: string;
-  channel: string;
+  visitorRecordId?: string;
+  siteId?: string | null;
+  channel?: string;
   touchedAt: string;
-  [key: string]: unknown;
+  offlineMode?: boolean;
 }
 
-export interface StoredTouch {
-  payload: TouchPayload;
-  response: TouchResponse;
-  recordedAt: number;
+export interface IdentifyPayload {
+  email?: string;
+  phone?: string;
 }
 
-export interface CheckoutSession {
+export interface IdentifyResponse {
+  customerId: string;
+  visitorId: string;
+  visitorRecordId: string;
+  touchIds: string[];
+  touchCount: number;
+  isNew: boolean;
+}
+
+export interface CheckoutSessionResponse {
   checkoutSessionId: string;
   token: string;
   visitorId: string;
-  visitorRecordId: string;
+  visitorRecordId?: string;
   touchIds: string[];
   touchCount: number;
   expiresAt: string;
 }
 
-export interface PaymentAttemptDetails {
-  gateway?: string;
-  buttonId?: string | null;
-  buttonClass?: string | null;
-  buttonText?: string | null;
-  amount?: number | null;
-  currency?: string | null;
-  productId?: string | null;
-  [key: string]: unknown;
-}
-
-export interface PaymentSuccessDetails {
-  gateway?: string;
-  transactionId?: string | null;
-  orderId?: string | null;
-  amount?: number | null;
-  currency?: string | null;
-  signature?: string | null;
-  [key: string]: unknown;
-}
-
-export interface PaymentFailureDetails {
-  gateway?: string;
-  code?: string | null;
-  message?: string | null;
-  [key: string]: unknown;
-}
-
-export abstract class PaymentGateway {
+export interface OrderItem {
   name: string;
-  config: ElysiumGatewayConfig;
-  constructor(name: string, config?: ElysiumGatewayConfig);
-  init(config?: ElysiumGatewayConfig): void;
-  canHandle(buttonOrContext: HTMLElement | Record<string, unknown>): boolean;
-  handleButtonClick(button: HTMLElement | null, context?: Record<string, unknown>): Promise<unknown>;
-  recordPaymentAttempt(details?: PaymentAttemptDetails): Promise<unknown>;
-  recordPaymentSuccess(paymentData?: PaymentSuccessDetails): Promise<unknown>;
-  recordPaymentFailure(errorData?: PaymentFailureDetails): Promise<unknown>;
-  on(event: 'attempt' | 'success' | 'failure', callback: (data: unknown) => void): () => void;
+  quantity: number;
+  unitAmount: number;
+  currency: string;
+  externalId?: string;
 }
 
-export class StripeGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-  checkRedirectReturn(): void;
-  wrapStripe<T>(stripeInstance: T): T;
+export interface CreateOrderPayload {
+  externalId: string;
+  orderedAt?: string;
+  currency: string;
+  grossAmount: number;
+  netAmount: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  checkoutToken?: string;
+  visitorId?: string;
+  email?: string;
+  phone?: string;
+  locationId?: string;
+  items?: OrderItem[];
+  idempotencyKey?: string;
+  connectorId?: string;
 }
 
-export class RazorpayGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-  wrapOptions<T extends Record<string, unknown>>(options: T): T;
-  wrapInstance<T>(rzpInstance: T): T;
+export interface CreateBookingPayload {
+  externalId: string;
+  appointmentStartAt: string;
+  currency: string;
+  bookedValue?: number;
+  checkoutToken?: string;
+  visitorId?: string;
+  email?: string;
+  phone?: string;
+  serviceName?: string;
+  appointmentEndAt?: string;
+  locationId?: string;
+  idempotencyKey?: string;
+  connectorId?: string;
 }
 
-export class PayPalGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-  wrapButtons<T extends Record<string, unknown>>(options: T): T;
+export interface ApiResponse<T = any> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+  status?: number;
+  blocked?: boolean;
+  rateLimit?: {
+    limit: string | null;
+    remaining: string | null;
+    reset: string | null;
+    retryAfter: string | null;
+  };
 }
 
-export class ShopifyGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-  attachCartAttributes(checkoutSessionId: string): Promise<void>;
-}
+export declare function init(config: ElysiumConfig): typeof Elysium;
+export declare function configure(updates: Partial<ElysiumConfig>): ElysiumConfig;
+export declare function getConfig(): ElysiumConfig;
+export declare function getVisitorId(): string;
+export declare function setVisitorId(newId: string): void;
+export declare function recordTouch(options?: { force?: boolean; customData?: Record<string, any> }): Promise<ApiResponse<TouchResponse>>;
+export declare function recordProductTouch(): Promise<ApiResponse<TouchResponse> | void>;
+export declare function identify(emailOrData: string | IdentifyPayload, phone?: string | null): Promise<ApiResponse<IdentifyResponse>>;
+export declare function identifyVisitor(emailOrData: string | IdentifyPayload, phone?: string | null): Promise<ApiResponse<IdentifyResponse>>;
+export declare function createCheckoutSession(options?: { expiresInMs?: number }): Promise<ApiResponse<CheckoutSessionResponse>>;
+export declare function getCheckoutToken(options?: { expiresInMs?: number }): Promise<string>;
+export declare function createOrder(orderData: CreateOrderPayload): Promise<ApiResponse<any>>;
+export declare function recordOrder(orderData: CreateOrderPayload): Promise<ApiResponse<any>>;
+export declare function recordConversion(orderData: CreateOrderPayload): Promise<ApiResponse<any>>;
+export declare function createBooking(bookingData: CreateBookingPayload): Promise<ApiResponse<any>>;
+export declare function recordBooking(bookingData: CreateBookingPayload): Promise<ApiResponse<any>>;
+export declare function buildPayload(customData?: Record<string, any>): TouchPayload;
+export declare function readTouchHistory(): any[];
+export declare function getTouchSignature(payload: TouchPayload): string;
+export declare function extractMarketingParams(search?: string): any;
+export declare function parseReferrer(referrer?: string, hostname?: string): any;
+export declare function initPaymentButtonDetection(selector?: string | null): () => void;
+export declare function registerGateway(name: string, instance: any): any;
+export declare function getGateway(name: string): any;
+export declare function recordPaymentSuccess(details?: any): Promise<any>;
+export declare function recordPaymentFailure(details?: any): Promise<any>;
+export declare function recordPaymentAttempt(details?: any): Promise<any>;
 
-export class WooCommerceGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-  injectHiddenCheckoutFields(): void;
-}
-
-export class SquareGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-}
-
-export class ZenotiGateway extends PaymentGateway {
-  constructor(config?: ElysiumGatewayConfig);
-}
-
-export class GenericGateway extends PaymentGateway {
-  constructor(name?: string, config?: ElysiumGatewayConfig);
-}
-
-export class GatewayRegistry {
-  register(name: string, gatewayInstance: PaymentGateway): PaymentGateway;
-  get(name: string): PaymentGateway | null;
-  getAll(): PaymentGateway[];
-  resolveForButton(buttonElement: HTMLElement | null): PaymentGateway;
-  configureAll(gatewaysConfig?: Record<string, ElysiumGatewayConfig>): void;
-}
-
-export function init(config?: Partial<ElysiumConfig>): typeof Elysium;
-export function configure(updates?: Partial<ElysiumConfig>): ElysiumConfig;
-export function getConfig(): ElysiumConfig;
-export function getVisitorId(): string;
-export function setVisitorId(newId: string): void;
-export function recordTouch(options?: { force?: boolean; customData?: Record<string, unknown> }): Promise<{ ok: boolean; data?: TouchResponse; error?: string; skipped?: boolean }>;
-export function recordProductTouch(): Promise<unknown>;
-export function identifyVisitor(email: string, traits?: Record<string, unknown>): Promise<boolean>;
-export function createCheckoutSession(): Promise<CheckoutSession>;
-export function buildPayload(customData?: Record<string, unknown>): TouchPayload;
-export function readTouchHistory(): StoredTouch[];
-export function getTouchSignature(payload: TouchPayload): string;
-export function initPaymentButtonDetection(customSelector?: string | null): () => void;
-export function registerGateway(name: string, gatewayInstance: PaymentGateway): PaymentGateway;
-export function getGateway(name: string): PaymentGateway | null;
-export function recordPaymentAttempt(details?: PaymentAttemptDetails): Promise<unknown>;
-export function recordPaymentSuccess(details?: PaymentSuccessDetails): Promise<unknown>;
-export function recordPaymentFailure(details?: PaymentFailureDetails): Promise<unknown>;
-
-export const Elysium: {
+export declare const Elysium: {
   init: typeof init;
   configure: typeof configure;
   getConfig: typeof getConfig;
@@ -207,25 +169,27 @@ export const Elysium: {
   setVisitorId: typeof setVisitorId;
   recordTouch: typeof recordTouch;
   recordProductTouch: typeof recordProductTouch;
+  identify: typeof identify;
   identifyVisitor: typeof identifyVisitor;
   createCheckoutSession: typeof createCheckoutSession;
+  getCheckoutToken: typeof getCheckoutToken;
+  createOrder: typeof createOrder;
+  recordOrder: typeof recordOrder;
+  recordConversion: typeof recordConversion;
+  createBooking: typeof createBooking;
+  recordBooking: typeof recordBooking;
   buildPayload: typeof buildPayload;
   readTouchHistory: typeof readTouchHistory;
   getTouchSignature: typeof getTouchSignature;
+  extractMarketingParams: typeof extractMarketingParams;
+  parseReferrer: typeof parseReferrer;
   initPaymentButtonDetection: typeof initPaymentButtonDetection;
   registerGateway: typeof registerGateway;
   getGateway: typeof getGateway;
   recordPaymentAttempt: typeof recordPaymentAttempt;
   recordPaymentSuccess: typeof recordPaymentSuccess;
   recordPaymentFailure: typeof recordPaymentFailure;
-  gateways: {
-    PaymentGateway: typeof PaymentGateway;
-    StripeGateway: typeof StripeGateway;
-    RazorpayGateway: typeof RazorpayGateway;
-    PayPalGateway: typeof PayPalGateway;
-    GenericGateway: typeof GenericGateway;
-    registry: GatewayRegistry;
-  };
+  gateways: Record<string, any>;
 };
 
 export default Elysium;

@@ -17,4 +17,16 @@ export class ZenotiGateway extends PaymentGateway {
     }
     return false;
   }
+
+  /**
+   * Helper to format Zenoti booking appointment notes with attribution token.
+   * Matches backend connector which parses `attribution_token:<token>`.
+   */
+  formatNote(token, existingNotes = '') {
+    if (!token) return existingNotes;
+    const tag = `attribution_token:${token}`;
+    if (!existingNotes) return tag;
+    if (existingNotes.includes('attribution_token:')) return existingNotes;
+    return `${existingNotes.trim()} ${tag}`;
+  }
 }

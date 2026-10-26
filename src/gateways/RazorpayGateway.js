@@ -1,4 +1,5 @@
 import { PaymentGateway } from './PaymentGateway.js';
+import { getCheckoutToken } from '../signals/touchEngine.js';
 import { logger } from '../utils/logger.js';
 
 export class RazorpayGateway extends PaymentGateway {
@@ -21,13 +22,35 @@ export class RazorpayGateway extends PaymentGateway {
   }
 
   /**
-   * Wrap Razorpay checkout options to automatically intercept payment success/dismissal
+   * Helper to attach attribution token into Razorpay checkout options notes.
+   * Matches backend connector which looks for payment.notes.attribution_token.
    */
-  wrapOptions(options = {}) {
+  attachToken(options = {}, token = null) {
+    if (!options || typeof options !== 'object') return options;
+    const attributionToken = token || options.checkoutToken;
+    if (attributionToken) {
+      options.notes = {
+        ...(options.notes || {}),
+        attribution_token: attributionToken,
+        checkout_token: attributionToken,
+      };
+    }
+    return options;
+  }
+
+  /**
+   * Wrap Razorpay checkout options to automatically attach attribution token
+   * and intercept payment success and modal dismissal.
+   */
+  wrapOptions(options = {}, token = null) {
     const originalHandler = options.handler;
 
     const wrappedOptions = {
       ...options,
+      notes: {
+        ...(options.notes || {}),
+        ...(token ? { attribution_token: token, checkout_token: token } : {}),
+      },
       handler: (response) => {
         logger.info('[Razorpay] Payment successful response received:', response);
 
@@ -37,6 +60,7 @@ export class RazorpayGateway extends PaymentGateway {
           signature: response.razorpay_signature,
           amount: options.amount ? options.amount / 100 : undefined,
           currency: options.currency || 'INR',
+          checkoutToken: token || options.notes?.attribution_token,
         });
 
         if (typeof originalHandler === 'function') {

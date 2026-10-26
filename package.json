@@ -1,6 +1,6 @@
 {
   "name": "elysium-attribution",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "description": "Multi-touch marketing attribution and payment gateway integration SDK for web storefronts and e-commerce platforms",
   "type": "module",
   "main": "./src/index.js",
@@ -14,8 +14,8 @@
     "./gateways": {
       "import": "./src/gateways/index.js"
     },
-    "./tracking": {
-      "import": "./src/tracking/touchTracker.js"
+    "./signals": {
+      "import": "./src/signals/touchEngine.js"
     },
     "./config": {
       "import": "./src/config/index.js"
@@ -35,6 +35,7 @@
     "stripe",
     "razorpay",
     "paypal",
+    "shopify",
     "payment-gateway",
     "e-commerce"
   ],

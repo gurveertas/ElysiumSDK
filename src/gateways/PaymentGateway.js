@@ -1,9 +1,11 @@
 import { getVisitorId } from '../signals/visitor.js';
-import { request } from '../signals/transport.js';
+import { getCheckoutToken, createOrder } from '../signals/touchEngine.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Base PaymentGateway class defining standard lifecycle and interface
+ * Base PaymentGateway class defining standard lifecycle and integration interfaces.
+ * Emits lifecycle events for attempts, successes, and failures,
+ * and automatically provisions checkout tokens for attribution.
  */
 export class PaymentGateway {
   constructor(name, config = {}) {
@@ -48,8 +50,20 @@ export class PaymentGateway {
   }
 
   /**
-   * Invoked when an elysium payment button associated with this gateway is clicked.
-   * NOTE: A button click is only a payment INTENT/ATTEMPT, never proof of payment!
+   * Attach attribution checkout token to target data/form
+   */
+  attachToken(target, token) {
+    if (!target) return target;
+    if (typeof target === 'object') {
+      target.attribution_token = token;
+      target.checkout_token = token;
+    }
+    return target;
+  }
+
+  /**
+   * Invoked when a payment or checkout button associated with this gateway is clicked.
+   * Obtains a checkout token, ensures hidden form inputs, and records an attempt.
    */
   async handleButtonClick(button, context = {}) {
     logger.info(`[Gateway:${this.name}] Payment button interaction detected:`, {
@@ -58,16 +72,53 @@ export class PaymentGateway {
       context,
     });
 
+    let checkoutToken = null;
+    try {
+      checkoutToken = await getCheckoutToken();
+    } catch (err) {
+      logger.debug(`[Gateway:${this.name}] Checkout token generation deferred:`, err);
+    }
+
+    // If button is inside a form, inject hidden input for attribution token
+    if (checkoutToken && button && typeof button.closest === 'function') {
+      const form = button.closest('form');
+      if (form) {
+        this.injectHiddenInput(form, 'attribution_token', checkoutToken);
+        this.injectHiddenInput(form, 'checkout_token', checkoutToken);
+        this.injectHiddenInput(form, 'elysium_visitor_id', getVisitorId());
+      }
+    }
+
     return this.recordPaymentAttempt({
       gateway: this.name,
       buttonId: button?.id || null,
       buttonClass: button?.className || null,
+      checkoutToken,
       ...context,
     });
   }
 
   /**
-   * Record payment attempt / checkout start
+   * Injects or updates a hidden input field in a form
+   */
+  injectHiddenInput(form, name, value) {
+    if (!form || !name) return;
+    try {
+      let input = form.querySelector(`input[name="${name}"]`);
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        form.appendChild(input);
+      }
+      input.value = value;
+    } catch {
+      // In SSR or sandboxed environment
+    }
+  }
+
+  /**
+   * Record payment attempt / checkout start (local event & notification)
    */
   async recordPaymentAttempt(details = {}) {
     const payload = {
@@ -80,27 +131,34 @@ export class PaymentGateway {
 
     this.emit('attempt', payload);
 
-    return request('/v1/payment/attempt', {
-      method: 'POST',
-      body: payload,
-    });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('elysium:payment_attempt', { detail: payload })
+      );
+    }
+
+    return { ok: true, data: payload };
   }
 
   /**
-   * Record verified payment success with transaction identifiers
+   * Record verified payment success.
+   * Emits lifecycle events and can optionally ingest order directly to backend.
    */
   async recordPaymentSuccess(paymentData = {}) {
+    const transactionId = paymentData.transactionId || paymentData.id || paymentData.orderId || null;
+    const amount = paymentData.amount ?? paymentData.grossAmount ?? null;
+    const currency = (paymentData.currency || 'USD').toUpperCase();
+
     const payload = {
       visitorId: getVisitorId(),
       gateway: this.name,
       status: 'succeeded',
-      transactionId: paymentData.transactionId || paymentData.id || null,
-      orderId: paymentData.orderId || null,
-      amount: paymentData.amount || null,
-      currency: paymentData.currency || 'USD',
+      transactionId,
+      orderId: paymentData.orderId || transactionId,
+      amount,
+      currency,
       timestamp: new Date().toISOString(),
       ...paymentData,
-      metadata: paymentData,
     };
 
     logger.info(`[Gateway:${this.name}] Payment succeeded:`, payload);
@@ -112,10 +170,25 @@ export class PaymentGateway {
       );
     }
 
-    return request('/v1/payment/success', {
-      method: 'POST',
-      body: payload,
-    });
+    // If externalId/transactionId and amount are provided, client can optionally ingest order
+    if (paymentData.autoCreateOrder && transactionId && amount !== null) {
+      try {
+        await createOrder({
+          externalId: transactionId,
+          orderedAt: payload.timestamp,
+          currency,
+          grossAmount: Number(amount),
+          netAmount: Number(paymentData.netAmount ?? amount),
+          checkoutToken: paymentData.checkoutToken,
+          email: paymentData.email,
+          phone: paymentData.phone,
+        });
+      } catch (err) {
+        logger.debug(`[Gateway:${this.name}] Auto createOrder failed:`, err);
+      }
+    }
+
+    return { ok: true, data: payload };
   }
 
   /**
@@ -141,10 +214,7 @@ export class PaymentGateway {
       );
     }
 
-    return request('/v1/payment/failure', {
-      method: 'POST',
-      body: payload,
-    });
+    return { ok: true, data: payload };
   }
 
   /**

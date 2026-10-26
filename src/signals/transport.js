@@ -39,14 +39,25 @@ export async function request(path, options = {}) {
       data = await response.text().catch(() => null);
     }
 
+    const rateLimit = {
+      limit: response.headers.get('x-ratelimit-limit'),
+      remaining: response.headers.get('x-ratelimit-remaining'),
+      reset: response.headers.get('x-ratelimit-reset'),
+      retryAfter: response.headers.get('retry-after'),
+    };
+
+    if (response.status === 429) {
+      logger.warn(`Rate limit reached for ${path}. Retry-After: ${rateLimit.retryAfter ?? 'unknown'}s`);
+    }
+
     if (!response.ok) {
       const errorMsg =
         (data && typeof data === 'object' && (data.message || data.error)) ||
         `Request to ${path} failed with HTTP status ${response.status}`;
-      return { ok: false, status: response.status, error: errorMsg, data };
+      return { ok: false, status: response.status, error: errorMsg, data, rateLimit };
     }
 
-    return { ok: true, status: response.status, data };
+    return { ok: true, status: response.status, data, rateLimit };
   } catch (error) {
     if (timeoutId) clearTimeout(timeoutId);
     const isAbort = error.name === 'AbortError';

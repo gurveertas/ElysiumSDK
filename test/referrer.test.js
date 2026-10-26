@@ -1,41 +1,40 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isInternalReferrer, parseReferrer } from '../src/tracking/referrer.js';
+import { isInternalReferrer, parseReferrer } from '../src/signals/referrer.js';
 
-describe('Referrer Parsing and Classification Module', () => {
-  it('identifies internal referrals correctly', () => {
-    assert.equal(isInternalReferrer('https://mystore.com/catalog', 'mystore.com'), true);
-    assert.equal(isInternalReferrer('https://shop.mystore.com/cart', 'mystore.com'), true);
-    assert.equal(isInternalReferrer('https://google.com', 'mystore.com'), false);
-    assert.equal(isInternalReferrer('', 'mystore.com'), false);
+describe('Referrer Parsing & Channel Classification Module', () => {
+  it('correctly classifies internal referrers on same or subdomain', () => {
+    assert.equal(isInternalReferrer('https://shop.example.com/checkout', 'example.com'), true);
+    assert.equal(isInternalReferrer('https://example.com/blog', 'example.com'), true);
+    assert.equal(isInternalReferrer('https://google.com/search', 'example.com'), false);
   });
 
-  it('classifies organic search engines', () => {
-    const googleResult = parseReferrer('https://www.google.com/search?q=shoes', 'mystore.com');
-    assert.equal(googleResult.channel, 'organic_search');
-    assert.equal(googleResult.detectedSource, 'google');
-    assert.equal(googleResult.detectedMedium, 'organic');
-
-    const bingResult = parseReferrer('https://www.bing.com/', 'mystore.com');
-    assert.equal(bingResult.channel, 'organic_search');
-    assert.equal(bingResult.detectedSource, 'bing');
+  it('classifies organic search referrers', () => {
+    const parsed = parseReferrer('https://www.google.com/search?q=shoes', 'mystore.com');
+    assert.equal(parsed.channel, 'organic_search');
+    assert.equal(parsed.detectedSource, 'google');
+    assert.equal(parsed.detectedMedium, 'organic');
   });
 
-  it('classifies social networks', () => {
-    const fbResult = parseReferrer('https://l.facebook.com/', 'mystore.com');
-    assert.equal(fbResult.channel, 'social');
-    assert.equal(fbResult.detectedSource, 'facebook');
-    assert.equal(fbResult.detectedMedium, 'social');
+  it('classifies social network referrers', () => {
+    const fb = parseReferrer('https://l.facebook.com/', 'mystore.com');
+    assert.equal(fb.channel, 'social');
+    assert.equal(fb.detectedSource, 'facebook');
 
-    const redditResult = parseReferrer('https://www.reddit.com/r/deals', 'mystore.com');
-    assert.equal(redditResult.channel, 'social');
-    assert.equal(redditResult.detectedSource, 'reddit');
+    const tw = parseReferrer('https://t.co/abcxyz', 'mystore.com');
+    assert.equal(tw.channel, 'social');
+    assert.equal(tw.detectedSource, 'twitter');
   });
 
-  it('filters out internal referrers and marks channel as internal', () => {
-    const internalResult = parseReferrer('https://mystore.com/products', 'mystore.com');
-    assert.equal(internalResult.isInternal, true);
-    assert.equal(internalResult.referrer, null);
-    assert.equal(internalResult.channel, 'internal');
+  it('classifies generic referral traffic', () => {
+    const ref = parseReferrer('https://techcrunch.com/article', 'mystore.com');
+    assert.equal(ref.channel, 'referral');
+    assert.equal(ref.detectedSource, 'techcrunch.com');
+  });
+
+  it('classifies direct traffic when no referrer provided', () => {
+    const direct = parseReferrer('', 'mystore.com');
+    assert.equal(direct.channel, 'direct');
+    assert.equal(direct.referrer, null);
   });
 });

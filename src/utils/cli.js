@@ -20,11 +20,11 @@ const template = `/**
  * Secret keys must remain strictly on your backend server.
  */
 export default {
-  // Public attribution API Key provided by Elysium
-  apiKey: "YOUR_ELYSIUM_PUBLIC_API_KEY",
+  // Public publishable API Key provided by Elysium (pk_live_... or pk_test_...)
+  apiKey: "pk_test_YOUR_PUBLISHABLE_KEY",
 
-  // Attribution API Backend endpoint
-  apiBaseUrl: "https://asbTemp-production.up.railway.app",
+  // Attribution Backend API endpoint (e.g. http://localhost:5000 or https://api.yourdomain.com)
+  apiBaseUrl: "http://localhost:5000",
 
   // Enable verbose debugging logs in browser console
   debug: false,

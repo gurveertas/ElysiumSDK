@@ -43,8 +43,9 @@ export function extractMarketingParams(locationSearch = '') {
   };
 
   // Ad cookies
+  const fbcCookie = getCookie('_fbc');
   const cookies = {
-    fbc: getCookie('_fbc'),
+    fbc: fbcCookie || (clickIds.fbclid ? `fb.1.${Date.now()}.${clickIds.fbclid}` : null),
     fbp: getCookie('_fbp'),
     ttp: getCookie('_ttp'),
     ga: getCookie('_ga'),

@@ -3,8 +3,15 @@ import { getVisitorId, setVisitorId } from './signals/visitor.js';
 import {
   recordTouch,
   recordProductTouch,
+  identify,
   identifyVisitor,
   createCheckoutSession,
+  getCheckoutToken,
+  createOrder,
+  recordOrder,
+  recordConversion,
+  createBooking,
+  recordBooking,
   buildPayload,
 } from './signals/touchEngine.js';
 import { readTouchHistory, getTouchSignature } from './signals/session.js';
@@ -30,6 +37,9 @@ let buttonDetectorCleanup = null;
 /**
  * Main SDK initialization method.
  * Configures API keys, starts tracking, registers gateways, and activates button detector.
+ *
+ * @param {Object} userConfig Configuration options
+ * @returns {Object} Elysium SDK instance
  */
 export function init(userConfig = {}) {
   const config = configManager.init(userConfig);
@@ -124,8 +134,15 @@ export const Elysium = {
   setVisitorId,
   recordTouch,
   recordProductTouch,
+  identify,
   identifyVisitor,
   createCheckoutSession,
+  getCheckoutToken,
+  createOrder,
+  recordOrder,
+  recordConversion,
+  createBooking,
+  recordBooking,
   buildPayload,
   readTouchHistory,
   getTouchSignature,
@@ -149,6 +166,41 @@ export const Elysium = {
     GenericGateway,
     registry: gatewayRegistry,
   },
+};
+
+// Re-export core modules for modular imports
+export {
+  getVisitorId,
+  setVisitorId,
+  recordTouch,
+  recordProductTouch,
+  identify,
+  identifyVisitor,
+  createCheckoutSession,
+  getCheckoutToken,
+  createOrder,
+  recordOrder,
+  recordConversion,
+  createBooking,
+  recordBooking,
+  buildPayload,
+  readTouchHistory,
+  getTouchSignature,
+  extractMarketingParams,
+  parseReferrer,
+  initPaymentButtonDetection,
+  getConfig,
+  setConfig,
+  gatewayRegistry,
+  PaymentGateway,
+  StripeGateway,
+  RazorpayGateway,
+  PayPalGateway,
+  ShopifyGateway,
+  WooCommerceGateway,
+  SquareGateway,
+  ZenotiGateway,
+  GenericGateway,
 };
 
 // Expose on global window object if running in browser

@@ -1,4 +1,5 @@
 import { PaymentGateway } from './PaymentGateway.js';
+import { getCheckoutToken } from '../signals/touchEngine.js';
 import { logger } from '../utils/logger.js';
 
 export class StripeGateway extends PaymentGateway {
@@ -19,6 +20,33 @@ export class StripeGateway extends PaymentGateway {
       }
     }
     return false;
+  }
+
+  /**
+   * Helper to attach attribution token into Stripe PaymentIntent or Checkout parameters.
+   * Matches backend connector which looks for metadata.attribution_token or metadata.checkout_token.
+   */
+  attachToken(target = {}, token = null) {
+    if (!target || typeof target !== 'object') return target;
+    const attributionToken = token || target.checkoutToken;
+    if (attributionToken) {
+      target.metadata = {
+        ...(target.metadata || {}),
+        attribution_token: attributionToken,
+        checkout_token: attributionToken,
+      };
+      // If Checkout Session options:
+      if (target.payment_intent_data) {
+        target.payment_intent_data.metadata = {
+          ...(target.payment_intent_data.metadata || {}),
+          attribution_token: attributionToken,
+        };
+      }
+      if (!target.client_reference_id) {
+        target.client_reference_id = attributionToken;
+      }
+    }
+    return target;
   }
 
   /**
@@ -55,15 +83,31 @@ export class StripeGateway extends PaymentGateway {
   }
 
   /**
-   * Instrument a Stripe instance to automatically intercept confirmPayment / confirmCardPayment
+   * Instrument a Stripe instance to automatically attach checkout tokens and intercept confirmPayment
    */
   wrapStripe(stripeInstance) {
     if (!stripeInstance) return stripeInstance;
 
     const originalConfirmPayment = stripeInstance.confirmPayment?.bind(stripeInstance);
     if (originalConfirmPayment) {
-      stripeInstance.confirmPayment = async (options) => {
-        this.recordPaymentAttempt({ method: 'confirmPayment', options });
+      stripeInstance.confirmPayment = async (options = {}) => {
+        let token = null;
+        try {
+          token = await getCheckoutToken();
+        } catch {
+          // Continue if token generation fails
+        }
+
+        if (token && options.confirmParams) {
+          options.confirmParams.payment_method_data = options.confirmParams.payment_method_data || {};
+          options.confirmParams.payment_method_data.metadata = {
+            ...(options.confirmParams.payment_method_data.metadata || {}),
+            attribution_token: token,
+          };
+        }
+
+        this.recordPaymentAttempt({ method: 'confirmPayment', options, token });
+
         try {
           const result = await originalConfirmPayment(options);
           if (result.error) {
@@ -71,9 +115,10 @@ export class StripeGateway extends PaymentGateway {
           } else if (result.paymentIntent?.status === 'succeeded') {
             this.recordPaymentSuccess({
               transactionId: result.paymentIntent.id,
-              amount: result.paymentIntent.amount / 100,
+              amount: result.paymentIntent.amount ? result.paymentIntent.amount / 100 : undefined,
               currency: result.paymentIntent.currency,
               paymentIntent: result.paymentIntent,
+              checkoutToken: token,
             });
           }
           return result;

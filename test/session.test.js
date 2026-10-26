@@ -5,8 +5,7 @@ import {
   saveSuccessfulTouch,
   readTouchHistory,
   TOUCH_HISTORY_KEY,
-  getTouchSignature,
-} from '../src/tracking/session.js';
+} from '../src/signals/session.js';
 import { safeLocalStorage } from '../src/utils/storage.js';
 import { configManager } from '../src/config/index.js';
 
@@ -105,7 +104,6 @@ describe('Session Tracking and Deduplication Module', () => {
 
     const history = readTouchHistory();
     assert.equal(history.length, 50);
-    // Oldest 10 items (0..9) should be dropped, item 10 should be the first
     assert.equal(history[0].payload.index, 10);
     assert.equal(history[49].payload.index, 59);
   });

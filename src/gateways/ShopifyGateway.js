@@ -1,5 +1,6 @@
 import { PaymentGateway } from './PaymentGateway.js';
 import { getVisitorId } from '../signals/visitor.js';
+import { getCheckoutToken } from '../signals/touchEngine.js';
 import { logger } from '../utils/logger.js';
 
 export class ShopifyGateway extends PaymentGateway {
@@ -22,33 +23,35 @@ export class ShopifyGateway extends PaymentGateway {
   }
 
   /**
-   * Attaches Elysium attribution metadata to Shopify cart before checkout redirect
+   * Attaches Elysium attribution metadata to Shopify cart before checkout redirect.
+   * Matches backend connector which looks for cart attributes named 'attribution_token' or 'checkout_token'.
    */
-  async attachCartAttributes(checkoutSessionId) {
+  async attachCartAttributes(token = null) {
     if (typeof window === 'undefined') return;
 
     try {
+      const checkoutToken = token || (await getCheckoutToken());
       const visitorId = getVisitorId();
+
       await fetch('/cart/update.js', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           attributes: {
-            elysium_session_id: checkoutSessionId,
+            attribution_token: checkoutToken,
+            checkout_token: checkoutToken,
             elysium_visitor_id: visitorId,
           },
         }),
       });
-      logger.info('[Shopify] Cart attributes attached successfully:', { checkoutSessionId, visitorId });
+      logger.info('[Shopify] Cart attributes attached successfully:', { attribution_token: checkoutToken, visitorId });
     } catch (err) {
       logger.warn('[Shopify] Could not update cart attributes:', err);
     }
   }
 
   async handleButtonClick(button, context = {}) {
-    if (context.checkoutSessionId) {
-      await this.attachCartAttributes(context.checkoutSessionId);
-    }
+    await this.attachCartAttributes(context.checkoutToken);
     return super.handleButtonClick(button, context);
   }
 }

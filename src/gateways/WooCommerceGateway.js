@@ -1,5 +1,6 @@
 import { PaymentGateway } from './PaymentGateway.js';
 import { getVisitorId } from '../signals/visitor.js';
+import { getCheckoutToken } from '../signals/touchEngine.js';
 
 export class WooCommerceGateway extends PaymentGateway {
   constructor(config = {}) {
@@ -21,21 +22,29 @@ export class WooCommerceGateway extends PaymentGateway {
   }
 
   /**
-   * Inject hidden inputs into WooCommerce checkout form for metadata propagation
+   * Inject hidden inputs into WooCommerce checkout form for attribution token and visitor propagation
    */
-  injectHiddenCheckoutFields() {
+  async injectHiddenCheckoutFields() {
     if (typeof document === 'undefined') return;
 
     const form = document.querySelector('form.checkout, form.woocommerce-checkout');
     if (!form) return;
 
-    let input = form.querySelector('input[name="billing_elysium_visitor_id"]');
-    if (!input) {
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'billing_elysium_visitor_id';
-      input.value = getVisitorId();
-      form.appendChild(input);
+    this.injectHiddenInput(form, 'billing_elysium_visitor_id', getVisitorId());
+
+    try {
+      const token = await getCheckoutToken();
+      if (token) {
+        this.injectHiddenInput(form, 'attribution_token', token);
+        this.injectHiddenInput(form, 'checkout_token', token);
+      }
+    } catch {
+      // Defer token generation if needed
     }
+  }
+
+  async handleButtonClick(button, context = {}) {
+    await this.injectHiddenCheckoutFields();
+    return super.handleButtonClick(button, context);
   }
 }

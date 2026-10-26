@@ -1,4 +1,5 @@
 import { PaymentGateway } from './PaymentGateway.js';
+import { getCheckoutToken } from '../signals/touchEngine.js';
 import { logger } from '../utils/logger.js';
 
 export class PayPalGateway extends PaymentGateway {
@@ -21,6 +22,19 @@ export class PayPalGateway extends PaymentGateway {
   }
 
   /**
+   * Helper to attach attribution token to PayPal purchase unit custom_id.
+   * Matches backend connector which maps checkoutToken from resource.custom_id.
+   */
+  attachToken(purchaseUnit = {}, token = null) {
+    if (!purchaseUnit || typeof purchaseUnit !== 'object') return purchaseUnit;
+    const attributionToken = token || purchaseUnit.checkoutToken;
+    if (attributionToken) {
+      purchaseUnit.custom_id = attributionToken;
+    }
+    return purchaseUnit;
+  }
+
+  /**
    * Wrap options passed to paypal.Buttons(...)
    */
   wrapButtons(options = {}) {
@@ -32,7 +46,15 @@ export class PayPalGateway extends PaymentGateway {
     return {
       ...options,
       createOrder: async (data, actions) => {
-        this.recordPaymentAttempt({ stage: 'createOrder', data });
+        let token = null;
+        try {
+          token = await getCheckoutToken();
+        } catch {
+          // Token generation fallback
+        }
+
+        this.recordPaymentAttempt({ stage: 'createOrder', data, token });
+
         if (typeof originalCreateOrder === 'function') {
           return originalCreateOrder(data, actions);
         }
